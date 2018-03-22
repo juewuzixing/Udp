@@ -12,27 +12,20 @@ UdpClient::UdpClient(QObject *parent) : QObject(parent) {
     QTimer *timer = new QTimer(this);
     timer->start(1000);
     connect(timer, &QTimer::timeout, [&]() {
-        sendMessage("nihao");
+        sendMessage("nihao122");
     });
 //    connect(socket,&QUdpSocket::readyRead,this,&UdpClient::responder);
 }
 
 void UdpClient::sendMessage(const QByteArray &message) {
     MagicFrame magicFrame;
+    memset(&magicFrame, 0, sizeof(MagicFrame));
     magicFrame.head = 0xAA;
-    magicFrame.crc = 0;
-    strcpy(magicFrame.data, message.data());
+    magicFrame.length = message.length(); // 发送数据的大小
     magicFrame.tail = 0x55;
 
-    auto tmp  = (char*)(&magicFrame);
-    auto size = sizeof(magicFrame);
+    memcpy(magicFrame.data, message, message.length());  //数据拷贝
 
-    int checksum = 0;
-    for (; size > 0; size--) {
-        auto mint8 = (uint8_t)tmp[0];
-        checksum += test(mint8);
-    }
-    qWarning() << checksum;
     socket->writeDatagram((const char*)(&magicFrame), sizeof(magicFrame), QHostAddress("172.10.11.9"), SERVER_UDP_PORT);
     qWarning() << "sendMessage:" << sizeof(magicFrame) << QByteArray((const char*)(&magicFrame), sizeof(magicFrame)).toHex();
 }

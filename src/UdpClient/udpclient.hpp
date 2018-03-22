@@ -10,8 +10,8 @@ const int CLIENT_UDP_PORT = 11111;
 
 typedef struct {
     quint8 head;
-    quint16 crc;
-    char data[8];
+    quint16 length;
+    char data[16];
     quint8 tail;
 }__attribute__((packed)) MagicFrame;
 
