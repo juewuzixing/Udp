@@ -7,6 +7,15 @@ const int CLIENT_UDP_PORT = 11111;
 #include <QObject>
 #include <QUdpSocket>
 #include <QString>
+#include <QTcpServer>
+
+typedef struct {
+    quint8 head;
+    quint16 length;
+    char data[16];
+    quint8 tail;
+}__attribute__((packed)) MagicFrame;
+
 
 class UdpServer : public QObject
 {
@@ -20,6 +29,8 @@ public:
 
     bool isClientAvailable();
 
+    bool startListen();
+
 signals:
 
 public slots:
@@ -28,12 +39,13 @@ public slots:
     void sendMessageToClient();
 
 private:
-    quint16 mClientPort{CLIENT_UDP_PORT};
-    QHostAddress mClientAddress{"172.10.11.9"};
+    quint16 mClientPort{0};
+    QHostAddress mClientAddress{"0"};
     QUdpSocket *mServerSocket = nullptr;
     int mServerPort;
     bool mClientAvailable = false;
     QString mMessage;
+    QTcpServer *mServer;
 };
 
 #endif // UDPSERVER_HPP

@@ -2,11 +2,13 @@
 #define UDPCLIENT_HPP
 
 #include <QObject>
-#include <QUdpSocket>
 #include <QTimer>
+#include <QUdpSocket>
+#include <QTcpServer>
+#include <QTcpSocket>
 
 const int SERVER_UDP_PORT = 55555;
-const int CLIENT_UDP_PORT = 11111;
+const int CLIENT_UDP_PORT = 1025;
 
 typedef struct {
     quint8 head;
@@ -35,6 +37,7 @@ public slots:
 
 private:
     QUdpSocket *socket;
+    QTcpSocket *mTcpSocket;
 };
 
 #endif // UDPCLIENT_HPP

@@ -4,17 +4,21 @@
 
 UdpClient::UdpClient(QObject *parent) : QObject(parent) {
     socket = new QUdpSocket(this);
+    mTcpSocket = new QTcpSocket;
 
     auto result = socket->bind(QHostAddress("172.10.11.9"),CLIENT_UDP_PORT);
     if (!result) {
         qWarning() << "bind:" << result;
     }
+
+    // send data to server
     QTimer *timer = new QTimer(this);
     timer->start(1000);
     connect(timer, &QTimer::timeout, [&]() {
-        sendMessage("nihao122");
+        sendMessage("A1025");
     });
-//    connect(socket,&QUdpSocket::readyRead,this,&UdpClient::responder);
+
+    connect(socket,&QUdpSocket::readyRead,this,&UdpClient::responder);
 }
 
 void UdpClient::sendMessage(const QByteArray &message) {
@@ -42,20 +46,13 @@ int UdpClient::test(int n)
 
 void UdpClient::responder() {
     // 读取信息
+    qWarning() << "#################messageToSend";
     QByteArray receivedDatagram;
     receivedDatagram.resize(socket->pendingDatagramSize());
+    socket->readDatagram(receivedDatagram.data(),receivedDatagram.size());
 
-    QHostAddress sender("172.10.11.9");
-    quint16 senderPort(SERVER_UDP_PORT);
-
-    socket->readDatagram(receivedDatagram.data(),receivedDatagram.size(),&sender,&senderPort);
-
-    qDebug() << "Received message: " << receivedDatagram.data();
-    qDebug() << "Sending server's port: " << senderPort;
-    qDebug() << "Sending server's ip address: " << sender.toString();
-
-    // 发回确认
-    QByteArray messageToSend;
-    messageToSend.append("UdpClient received your message.");
-    socket->writeDatagram(messageToSend,sender,senderPort);
+    if (receivedDatagram.contains("B")) {
+        auto tcpPort = receivedDatagram.remove(0, 1).toInt();
+        mTcpSocket->connectToHost("172.10.11.9", tcpPort);
+    }
 }
