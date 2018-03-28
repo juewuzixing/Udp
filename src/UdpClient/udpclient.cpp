@@ -3,20 +3,20 @@
 #include <QString>
 
 UdpClient::UdpClient(QObject *parent) : QObject(parent) {
+    qWarning() << "UdpClient is start!";
+
     socket = new QUdpSocket(this);
     mTcpSocket = new QTcpSocket;
 
-    auto result = socket->bind(QHostAddress("172.10.11.9"),CLIENT_UDP_PORT);
-    if (!result) {
-        qWarning() << "bind:" << result;
-    }
-
     // send data to server
-    QTimer *timer = new QTimer(this);
-    timer->start(1000);
-    connect(timer, &QTimer::timeout, [&]() {
-        sendMessage("A1025");
-    });
+    mRand = generateRandomInteger(1024, 65535);
+
+    if (!socket->bind(QHostAddress("172.10.11.9"),mRand)) {
+        qWarning() << "bind failed:" << mRand;
+    } else {
+        qWarning() << "bind success:" << mRand;
+        sendMessage(QByteArray::number(mRand));
+    }
 
     connect(socket,&QUdpSocket::readyRead,this,&UdpClient::responder);
 }
@@ -46,13 +46,37 @@ int UdpClient::test(int n)
 
 void UdpClient::responder() {
     // 读取信息
-    qWarning() << "#################messageToSend";
     QByteArray receivedDatagram;
     receivedDatagram.resize(socket->pendingDatagramSize());
     socket->readDatagram(receivedDatagram.data(),receivedDatagram.size());
 
-    if (receivedDatagram.contains("B")) {
-        auto tcpPort = receivedDatagram.remove(0, 1).toInt();
+    // startListen();
+    if (receivedDatagram.data()) {
+        auto tcpPort = receivedDatagram.toInt();
+        qWarning() << "tcpPort: " << tcpPort;
         mTcpSocket->connectToHost("172.10.11.9", tcpPort);
     }
+}
+
+int UdpClient::generateRandomInteger(int min, int max) {
+    Q_ASSERT(min < max);
+    static bool seedStatus;
+    if (!seedStatus) {
+        qsrand(QTime(0,0,0).secsTo(QTime::currentTime()));
+        seedStatus = true;
+    }
+    int nRandom = qrand() % (max - min);
+    nRandom = min + nRandom;
+
+    return nRandom;
+}
+
+bool UdpClient::startListen() {
+    // 随机port
+//    if (!mTcpSocket->isListening()) {
+//        mServer->listen(QHostAddress::Any, mRand);
+//        return true;
+//    } else {
+//        return false;
+//    }
 }

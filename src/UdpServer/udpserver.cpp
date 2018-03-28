@@ -2,8 +2,10 @@
 
 UdpServer::UdpServer(QString serverIP, int serverPort, QObject *parent) :
     QObject(parent),mServerPort(serverPort) {
+    qWarning() << "UdpServer is start!";
     mServerSocket = new QUdpSocket(this);
     mServer = new QTcpServer(this);
+
     // bind port
     auto result = mServerSocket->bind(QHostAddress(serverIP),serverPort,QUdpSocket::DefaultForPlatform);
     if (!result) {
@@ -19,31 +21,40 @@ void UdpServer::responder() {
     QByteArray receivedDatagram;
     receivedDatagram.resize(mServerSocket->pendingDatagramSize());
     mServerSocket->readDatagram(receivedDatagram.data(),receivedDatagram.size(),&mClientAddress);
+
     qWarning() << "mClientAddress:" << mClientAddress;
+    qWarning() << "receivedDatagram.size():" << receivedDatagram.size() << "sizeof(MagicFrame)" <<  sizeof(MagicFrame);
+    qWarning() << "receivedDatagram.data():" << receivedDatagram.toHex();
 
-    if (receivedDatagram.size() >= sizeof(MagicFrame)) {
-        MagicFrame *magicFrame = (MagicFrame *)((uint8_t *)receivedDatagram.data());
-        // 解析去掉A
-        QByteArray receivedData = magicFrame->data;
-        qWarning() << "receivedData" << receivedData;
-        if (receivedData.contains("A")) {
-            mClientPort = receivedData.remove(0, 1).toInt();
-        }
-        qDebug() << "Received the data is: "<< mClientPort;
+    int firstHeadIndex = receivedDatagram.indexOf(0xAA);
+    if (firstHeadIndex > -1) {
+        receivedDatagram.remove(0, firstHeadIndex);
+    } else {
+        receivedDatagram.clear();
+        return;
+    }
 
-        auto bindResult = mServer->listen(QHostAddress::Any,22222);
-        if (!bindResult) {
-            qWarning() << "listen is not success!";
+    QByteArray messageToClient;
+    QByteArray bf = receivedDatagram.left(MAGIC_FRAME_LEN);
+    MagicFrame *magicFrame = (MagicFrame* )bf.data();
+
+    if(bf.length() >= MAGIC_FRAME_LEN) {
+        qWarning() << "magicFrame->length == FRAME_DATA_LEN";
+        if ((quint8)0x55 == (quint8)bf[MAGIC_FRAME_LEN-1]) {
+            mTcpRandPort = generateRandomInteger(1024,65535);
+            if (!mServer->isListening() && mServer->listen(QHostAddress::Any,mTcpRandPort)) {
+                connect(mServer,&QTcpServer::newConnection,[&]() {
+                    qWarning() << "the newConnection QTcpServer newConnection!";
+                });
+                qWarning() << "listened" << mTcpRandPort;
+            } else {
+                qWarning() << "listen failed" << mTcpRandPort;
+            }
+            messageToClient.append(QByteArray::number(mTcpRandPort));
+            mServerSocket->writeDatagram(messageToClient,mClientAddress,QString(magicFrame->data).toInt());
         } else {
-            qWarning() << "listen success!";
+            qWarning() << "can not find tail";
         }
-        connect(mServer,&QTcpServer::newConnection,[&]() {
-            qWarning() << "the newConnection!";
-        });
-        // 发回确认,暂时是固定端口
-        QByteArray messageToSend;
-        messageToSend.append("B22222");
-        mServerSocket->writeDatagram(messageToSend,mClientAddress,mClientPort);
     }
 }
 
@@ -56,7 +67,7 @@ void UdpServer::sendMessageToClient() {
     qDebug() << "Sending message to client...";
     qDebug() << "At IP address: " << mClientAddress.toString();
     qDebug() << "Port: " << mClientPort;
-    //     QTcpSocket* socket = mServer->nextPendingConnection();
+//    QTcpSocket* socket = mServer->nextPendingConnection();
     // 发送数据
     QByteArray messageToSend;
     messageToSend.append(mMessage);
@@ -74,11 +85,26 @@ bool UdpServer::isClientAvailable() {
 
 bool UdpServer::startListen() {
     // 随机port
-    if (!mServer->listen(QHostAddress::Any,11111) && !mServer->isListening()) {
-        qWarning() << "Nothing listen.";
-        //        return false;
-    } else {
-        qWarning() << "listened" << mServer->isListening();
+    if (!mServer->isListening()) {
+        mServer->listen(QHostAddress::Any,mTcpRandPort);
+        qWarning() << "33333:" << mTcpRandPort;
         return true;
+    } else {
+        mServer->listen(QHostAddress::Any,mTcpRandPort);
+        qWarning() << "33333:" << mTcpRandPort;
+        return false;
     }
+}
+
+int UdpServer::generateRandomInteger(int min, int max) {
+    Q_ASSERT(min < max);
+    static bool seedStatus;
+    if (!seedStatus) {
+        qsrand(QTime(0,0,0).secsTo(QTime::currentTime()));
+        seedStatus = true;
+    }
+    int nRandom = qrand() % (max - min);
+    nRandom = min + nRandom;
+
+    return nRandom;
 }
